@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP Financeiro // Fluxo de Caixa & Contas Bancárias</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="tag">SYS.FIN // ERP v1.2</span>
+      <h1>ERP Financeiro Modular</h1>
+      <p class="subtitle">Contas a Pagar · Contas a Receber · Fluxo de Caixa · Multi-Banco</p>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="filtro-banco">Banco:</label>
+        <select id="filtro-banco">
+          <option value="todos">Todos os Bancos</option>
+          <option value="Itaú">Itaú</option>
+          <option value="Bradesco">Bradesco</option>
+          <option value="Santander">Santander</option>
+          <option value="Nubank Empresas">Nubank Empresas</option>
+          <option value="BTG Pactual">BTG Pactual</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="filtro-status">Status:</label>
+        <select id="filtro-status">
+          <option value="todos">Todos</option>
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+          <option value="atrasado">Atrasado</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="visao-fluxo">Janela:</label>
+        <select id="visao-fluxo">
+          <option value="diario">Fluxo Diário</option>
+          <option value="mensal">Fluxo Mensal</option>
+        </select>
+      </div>
+
+      <button type="button" id="btn-verificar-atrasos" class="btn-outline">Checar Vencimentos</button>
+      <button type="button" id="btn-exportar-json" class="btn-outline">Exportar JSON</button>
+      <button type="button" id="btn-resetar-dados" class="btn-danger-outline">Resetar Demo</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- KPIs Principais -->
+    <section class="kpis" aria-label="Indicadores financeiros">
+      <article class="card glow-purple">
+        <span class="card-label">A Receber (Em Aberto)</span>
+        <strong id="kpi-receber" class="positivo">R$ 0,00</strong>
+        <small id="meta-receber" class="card-meta">0 títulos pendentes/atrasados</small>
+      </article>
+
+      <article class="card glow-purple">
+        <span class="card-label">A Pagar (Em Aberto)</span>
+        <strong id="kpi-pagar" class="negativo">R$ 0,00</strong>
+        <small id="meta-pagar" class="card-meta">0 títulos pendentes/atrasados</small>
+      </article>
+
+      <article class="card glow-green">
+        <span class="card-label">Saldo Consolidado (Bancos)</span>
+        <strong id="kpi-liquido">R$ 0,00</strong>
+        <small class="card-meta">Saldo inicial + lançamentos pagos</small>
+      </article>
+
+      <article class="card glow-green">
+        <span class="card-label">Fluxo Realizado (<span id="label-periodo">Diário</span>)</span>
+        <strong id="kpi-fluxo">R$ 0,00</strong>
+        <small id="meta-fluxo" class="card-meta">Entradas pagas menos saídas pagas</small>
+      </article>
+    </section>
+
+    <!-- Contas Bancárias Separadas por Banco -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Contas Bancárias & Conciliação por Instituição</h2>
+        <span class="panel-badge">MULTI-CONTA</span>
+      </div>
+      <div id="lista-bancos" class="bancos-grid"></div>
+    </section>
+
+    <!-- Formulário de Novo Lançamento -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Registrar Novo Lançamento</h2>
+        <span class="panel-badge">REAL-TIME LEDGER</span>
+      </div>
+      <form id="form-lancamento" class="form-grid">
+        <div class="field">
+          <label for="descricao">Descrição</label>
+          <input type="text" id="descricao" placeholder="Ex.: Contrato Cloud AWS / Cliente Corp" required />
+        </div>
+
+        <div class="field">
+          <label for="tipo">Tipo</label>
+          <select id="tipo" required>
+            <option value="receber">Conta a Receber</option>
+            <option value="pagar">Conta a Pagar</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="banco">Banco</label>
+          <select id="banco" required>
+            <option value="Itaú">Itaú</option>
+            <option value="Bradesco">Bradesco</option>
+            <option value="Santander">Santander</option>
+            <option value="Nubank Empresas">Nubank Empresas</option>
+            <option value="BTG Pactual">BTG Pactual</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="valor">Valor (R$)</label>
+          <input type="number" id="valor" step="0.01" min="0.01" placeholder="1500.00" required />
+        </div>
+
+        <div class="field">
+          <label for="vencimento">Vencimento</label>
+          <input type="date" id="vencimento" required />
+        </div>
+
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" required>
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="atrasado">Atrasado</option>
+          </select>
+        </div>
+
+        <div class="field field-action">
+          <button type="submit" class="btn-primary">+ Adicionar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tabela de Contas a Pagar e Receber -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Livro de Contas a Pagar e Receber</h2>
+        <span id="contador-linhas" class="panel-badge">0 registros</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Tipo</th>
+              <th>Banco</th>
+              <th>Vencimento</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-lancamentos"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
