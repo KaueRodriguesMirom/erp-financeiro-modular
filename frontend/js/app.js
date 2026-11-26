@@ -1,260 +1,542 @@
-const STORAGE_KEY = "erp_financeiro_lancamentos_v2";
+const API_BASE_URL = window.ERP_API_URL || "http://127.0.0.1:8000";
 
-const BANCOS_INICIAIS = [
-  { nome: "Itaú", saldoInicial: 12500.0, statusConta: "Conciliada" },
-  { nome: "Bradesco", saldoInicial: 6400.0, statusConta: "Conciliada" },
-  { nome: "Santander", saldoInicial: 3200.0, statusConta: "Pendência" },
-  { nome: "Nubank Empresas", saldoInicial: 8900.0, statusConta: "Conciliada" },
-  { nome: "BTG Pactual", saldoInicial: 15000.0, statusConta: "Reserva" }
+const BANCO_PARA_CONTA_ID = {
+  "Itaú": 1,
+  "Bradesco": 2,
+  "Santander": 3,
+  "Nubank Empresas": 4,
+  "BTG Pactual": 5,
+};
+
+const FALLBACK_CONTAS = [
+  {
+    id_conta: 1,
+    banco: "Itaú",
+    apelido_conta: "Conta Principal",
+    tipo_conta: "corrente",
+    status_conta: "conciliada",
+    saldo_inicial: 12500.0,
+    variacao_liquidada: 4200.0,
+    saldo_atual: 16700.0,
+    qtd_em_aberto: 0,
+    qtd_atrasados: 0,
+  },
+  {
+    id_conta: 2,
+    banco: "Bradesco",
+    apelido_conta: "Operacional Filial",
+    tipo_conta: "corrente",
+    status_conta: "conciliada",
+    saldo_inicial: 6400.0,
+    variacao_liquidada: 0.0,
+    saldo_atual: 6400.0,
+    qtd_em_aberto: 1,
+    qtd_atrasados: 0,
+  },
+  {
+    id_conta: 3,
+    banco: "Santander",
+    apelido_conta: "Cobrança / Boleta",
+    tipo_conta: "corrente",
+    status_conta: "pendencia",
+    saldo_inicial: 3200.0,
+    variacao_liquidada: 0.0,
+    saldo_atual: 3200.0,
+    qtd_em_aberto: 1,
+    qtd_atrasados: 1,
+  },
+  {
+    id_conta: 4,
+    banco: "Nubank Empresas",
+    apelido_conta: "Pagamentos Cloud",
+    tipo_conta: "pagamento",
+    status_conta: "conciliada",
+    saldo_inicial: 8900.0,
+    variacao_liquidada: 0.0,
+    saldo_atual: 8900.0,
+    qtd_em_aberto: 1,
+    qtd_atrasados: 0,
+  },
+  {
+    id_conta: 5,
+    banco: "BTG Pactual",
+    apelido_conta: "Caixa / Reserva",
+    tipo_conta: "reserva",
+    status_conta: "reserva",
+    saldo_inicial: 15000.0,
+    variacao_liquidada: 6500.0,
+    saldo_atual: 21500.0,
+    qtd_em_aberto: 0,
+    qtd_atrasados: 0,
+  },
 ];
 
-const LANCAMENTOS_EXEMPLO = [
-  { id: 1, descricao: "Contrato SaaS Cliente Alpha", tipo: "receber", banco: "Itaú", vencimento: "2026-11-25", valor: 4200.0, status: "pago" },
-  { id: 2, descricao: "Cluster Cloud & Observabilidade", tipo: "pagar", banco: "Nubank Empresas", vencimento: "2026-11-25", valor: 950.0, status: "pendente" },
-  { id: 3, descricao: "Licença Segurança Corporativa", tipo: "pagar", banco: "Santander", vencimento: "2026-11-18", valor: 1300.0, status: "atrasado" },
-  { id: 4, descricao: "Consultoria Arquitetura Q4", tipo: "receber", banco: "BTG Pactual", vencimento: "2026-11-12", valor: 6500.0, status: "pago" },
-  { id: 5, descricao: "Insumos Operacionais Filial SP", tipo: "pagar", banco: "Bradesco", vencimento: "2026-11-28", valor: 1180.0, status: "pendente" }
+const FALLBACK_LANCAMENTOS = [
+  {
+    id_lancamento: 1,
+    id_conta: 1,
+    banco: "Itaú",
+    apelido_conta: "Conta Principal",
+    id_categoria: 1,
+    categoria: "Assinaturas & Serviços",
+    descricao: "Contrato SaaS Cliente Alpha",
+    tipo: "receber",
+    valor: 4200.0,
+    data_vencimento: "2026-11-25",
+    data_pagamento: "2026-11-25",
+    status: "pago",
+  },
+  {
+    id_lancamento: 2,
+    id_conta: 4,
+    banco: "Nubank Empresas",
+    apelido_conta: "Pagamentos Cloud",
+    id_categoria: 3,
+    categoria: "Infraestrutura & Cloud",
+    descricao: "Cluster Cloud & Observabilidade",
+    tipo: "pagar",
+    valor: 950.0,
+    data_vencimento: "2026-11-25",
+    data_pagamento: null,
+    status: "pendente",
+  },
+  {
+    id_lancamento: 3,
+    id_conta: 3,
+    banco: "Santander",
+    apelido_conta: "Cobrança / Boleta",
+    id_categoria: 4,
+    categoria: "Licenças & Segurança",
+    descricao: "Licença Segurança Corporativa",
+    tipo: "pagar",
+    valor: 1300.0,
+    data_vencimento: "2026-11-18",
+    data_pagamento: null,
+    status: "atrasado",
+  },
+  {
+    id_lancamento: 4,
+    id_conta: 5,
+    banco: "BTG Pactual",
+    apelido_conta: "Caixa / Reserva",
+    id_categoria: 2,
+    categoria: "Consultoria & Projetos",
+    descricao: "Consultoria Arquitetura Q4",
+    tipo: "receber",
+    valor: 6500.0,
+    data_vencimento: "2026-11-12",
+    data_pagamento: "2026-11-12",
+    status: "pago",
+  },
+  {
+    id_lancamento: 5,
+    id_conta: 2,
+    banco: "Bradesco",
+    apelido_conta: "Operacional Filial",
+    id_categoria: 5,
+    categoria: "Operação & Suprimentos",
+    descricao: "Insumos Operacionais Filial SP",
+    tipo: "pagar",
+    valor: 1180.0,
+    data_vencimento: "2026-11-28",
+    data_pagamento: null,
+    status: "pendente",
+  },
 ];
 
-let lancamentos = carregarLancamentos();
+const state = {
+  apiOnline: false,
+  periodoFluxo: "diario",
+  filtroStatus: "todos",
+  filtroBanco: "todos",
+  contas: structuredClone(FALLBACK_CONTAS),
+  lancamentos: structuredClone(FALLBACK_LANCAMENTOS),
+  fluxo: {
+    total_entradas: 4200.0,
+    total_saidas: 0.0,
+    saldo_liquido: 4200.0,
+  },
+};
 
-function carregarLancamentos() {
-  const salvo = localStorage.getItem(STORAGE_KEY);
-  if (salvo) return JSON.parse(salvo);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(LANCAMENTOS_EXEMPLO));
-  return [...LANCAMENTOS_EXEMPLO];
+function formatarMoeda(valor) {
+  const num = Number(valor || 0);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+  }).format(num);
 }
 
-function salvarLancamentos() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lancamentos));
+function formatarData(isoDate) {
+  if (!isoDate) return "—";
+  const [ano, mes, dia] = String(isoDate).slice(0, 10).split("-");
+  if (!ano || !mes || !dia) return isoDate;
+  return `${dia}/${mes}/${ano}`;
 }
 
-function formatarBRL(valor) {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function hojeISO() {
-  const agora = new Date();
-  const offset = agora.getTimezoneOffset() * 60000;
-  return new Date(agora - offset).toISOString().slice(0, 10);
-}
-
-function calcularSaldoBanco(bancoObj) {
-  const movimentacoesPagas = lancamentos
-    .filter((l) => l.banco === bancoObj.nome && l.status === "pago")
-    .reduce((acc, l) => (l.tipo === "receber" ? acc + l.valor : acc - l.valor), 0);
-
-  return bancoObj.saldoInicial + movimentacoesPagas;
-}
-
-function verificarVencimentosAtrasados() {
-  const hoje = hojeISO();
-  let alterados = 0;
-
-  lancamentos = lancamentos.map((item) => {
-    if (item.status === "pendente" && item.vencimento < hoje) {
-      alterados += 1;
-      return { ...item, status: "atrasado" };
-    }
-    return item;
-  });
-
-  if (alterados > 0) {
-    salvarLancamentos();
-    renderTudo();
-  }
-  alert(
-    alterados > 0
-      ? `${alterados} lançamento(s) vencido(s) atualizado(s) para ATRASADO.`
-      : "Nenhum título pendente vencido encontrado."
-  );
-}
-
-function renderBancos() {
-  const container = document.getElementById("lista-bancos");
-  container.innerHTML = "";
-
-  BANCOS_INICIAIS.forEach((banco) => {
-    const saldoAtual = calcularSaldoBanco(banco);
-    const abertosBanco = lancamentos.filter(
-      (l) => l.banco === banco.nome && l.status !== "pago"
-    );
-    const atrasadosBanco = abertosBanco.filter((l) => l.status === "atrasado").length;
-
-    const card = document.createElement("div");
-    card.className = "banco-card";
-    card.innerHTML = `
-      <div class="banco-header">
-        <span class="banco-nome">${banco.nome}</span>
-        <span class="banco-pill ${atrasadosBanco > 0 ? "alerta" : ""}">
-          ${atrasadosBanco > 0 ? `${atrasadosBanco} ATRASADO` : banco.statusConta}
-        </span>
-      </div>
-      <div class="banco-saldo">${formatarBRL(saldoAtual)}</div>
-      <div class="banco-status">${abertosBanco.length} lançamento(s) em aberto</div>
-    `;
-    container.appendChild(card);
-  });
-}
-
-function renderKPIs() {
-  const bancoFiltro = document.getElementById("filtro-banco").value;
-  const visao = document.getElementById("visao-fluxo").value;
-  document.getElementById("label-periodo").textContent = visao === "diario" ? "Diário" : "Mensal";
-
-  const baseLancamentos =
-    bancoFiltro === "todos"
-      ? lancamentos
-      : lancamentos.filter((l) => l.banco === bancoFiltro);
-
-  const abertosReceber = baseLancamentos.filter((l) => l.tipo === "receber" && l.status !== "pago");
-  const abertosPagar = baseLancamentos.filter((l) => l.tipo === "pagar" && l.status !== "pago");
-
-  const totalReceber = abertosReceber.reduce((acc, l) => acc + l.valor, 0);
-  const totalPagar = abertosPagar.reduce((acc, l) => acc + l.valor, 0);
-
-  const bancosAlvo =
-    bancoFiltro === "todos"
-      ? BANCOS_INICIAIS
-      : BANCOS_INICIAIS.filter((b) => b.nome === bancoFiltro);
-
-  const saldoTotalBancos = bancosAlvo.reduce((acc, b) => acc + calcularSaldoBanco(b), 0);
-
-  const hoje = hojeISO();
+function calcularFluxoFallback(periodo) {
+  const hoje = new Date().toISOString().slice(0, 10);
   const mesAtual = hoje.slice(0, 7);
 
-  const pagosPeriodo = baseLancamentos.filter((l) => {
-    if (l.status !== "pago") return false;
-    return visao === "diario" ? l.vencimento === hoje : l.vencimento.startsWith(mesAtual);
+  const pagos = state.lancamentos.filter((item) => {
+    if (item.status !== "pago") return false;
+    const ref = item.data_pagamento || item.data_vencimento || "";
+    return periodo === "diario" ? ref === hoje : ref.startsWith(mesAtual);
   });
 
-  const entradasPeriodo = pagosPeriodo
-    .filter((l) => l.tipo === "receber")
-    .reduce((acc, l) => acc + l.valor, 0);
+  const entradas = pagos
+    .filter((i) => i.tipo === "receber")
+    .reduce((acc, i) => acc + Number(i.valor || 0), 0);
+  const saidas = pagos
+    .filter((i) => i.tipo === "pagar")
+    .reduce((acc, i) => acc + Number(i.valor || 0), 0);
 
-  const saidasPeriodo = pagosPeriodo
-    .filter((l) => l.tipo === "pagar")
-    .reduce((acc, l) => acc + l.valor, 0);
-
-  const fluxoPeriodo = entradasPeriodo - saidasPeriodo;
-
-  document.getElementById("kpi-receber").textContent = formatarBRL(totalReceber);
-  document.getElementById("meta-receber").textContent = `${abertosReceber.length} título(s) em aberto`;
-
-  document.getElementById("kpi-pagar").textContent = formatarBRL(totalPagar);
-  document.getElementById("meta-pagar").textContent = `${abertosPagar.length} título(s) em aberto`;
-
-  document.getElementById("kpi-liquido").textContent = formatarBRL(saldoTotalBancos);
-
-  const elFluxo = document.getElementById("kpi-fluxo");
-  elFluxo.textContent = formatarBRL(fluxoPeriodo);
-  elFluxo.className = fluxoPeriodo >= 0 ? "positivo" : "negativo";
-  document.getElementById("meta-fluxo").textContent =
-    `Entradas: ${formatarBRL(entradasPeriodo)} · Saídas: ${formatarBRL(saidasPeriodo)}`;
+  return {
+    total_entradas: entradas,
+    total_saidas: saidas,
+    saldo_liquido: entradas - saidas,
+  };
 }
 
-function alternarStatus(id) {
-  const ordem = ["pendente", "pago", "atrasado"];
-  lancamentos = lancamentos.map((item) => {
-    if (item.id !== id) return item;
-    const prox = ordem[(ordem.indexOf(item.status) + 1) % ordem.length];
-    return { ...item, status: prox };
-  });
-  salvarLancamentos();
-  renderTudo();
+async function apiRequest(path, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      ...options,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status}: ${text}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
-function excluirLancamento(id) {
-  lancamentos = lancamentos.filter((item) => item.id !== id);
-  salvarLancamentos();
-  renderTudo();
+async function carregarDados() {
+  try {
+    await apiRequest("/health");
+    const [contas, lancamentos, fluxo] = await Promise.all([
+      apiRequest("/contas"),
+      apiRequest("/lancamentos"),
+      apiRequest(`/fluxo-caixa?periodo=${encodeURIComponent(state.periodoFluxo)}`),
+    ]);
+
+    state.apiOnline = true;
+    state.contas = Array.isArray(contas) ? contas : structuredClone(FALLBACK_CONTAS);
+    state.lancamentos = Array.isArray(lancamentos)
+      ? lancamentos
+      : structuredClone(FALLBACK_LANCAMENTOS);
+    state.fluxo = fluxo || calcularFluxoFallback(state.periodoFluxo);
+  } catch (err) {
+    console.warn("API indisponível ou com erro, usando dados locais:", err.message);
+    state.apiOnline = false;
+    state.contas = structuredClone(FALLBACK_CONTAS);
+    state.lancamentos = structuredClone(FALLBACK_LANCAMENTOS);
+    state.fluxo = calcularFluxoFallback(state.periodoFluxo);
+  }
+
+  renderizarTudo();
 }
 
-function renderTabela() {
-  const filtroStatus = document.getElementById("filtro-status").value;
-  const filtroBanco = document.getElementById("filtro-banco").value;
-  const tbody = document.getElementById("tabela-lancamentos");
-  tbody.innerHTML = "";
-
-  const filtrados = lancamentos.filter((l) => {
-    const matchStatus = filtroStatus === "todos" || l.status === filtroStatus;
-    const matchBanco = filtroBanco === "todos" || l.banco === filtroBanco;
+function getLancamentosFiltrados() {
+  return state.lancamentos.filter((item) => {
+    const matchStatus =
+      state.filtroStatus === "todos" || !state.filtroStatus || item.status === state.filtroStatus;
+    const matchBanco =
+      state.filtroBanco === "todos" || !state.filtroBanco || String(item.banco) === state.filtroBanco;
     return matchStatus && matchBanco;
   });
-
-  document.getElementById("contador-linhas").textContent = `${filtrados.length} registro(s)`;
-
-  filtrados.forEach((item) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.descricao}</td>
-      <td>${item.tipo === "receber" ? "A Receber" : "A Pagar"}</td>
-      <td>${item.banco}</td>
-      <td>${item.vencimento}</td>
-      <td class="${item.tipo === "receber" ? "positivo" : "negativo"}">${formatarBRL(item.valor)}</td>
-      <td><span class="badge badge-${item.status}">${item.status}</span></td>
-      <td>
-        <div class="acoes-cell">
-          <button class="btn-acao" onclick="alternarStatus(${item.id})">Status</button>
-          <button class="btn-excluir" onclick="excluirLancamento(${item.id})">Excluir</button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
-function exportarJSON() {
-  const blob = new Blob([JSON.stringify({ bancos: BANCOS_INICIAIS, lancamentos }, null, 2)], {
-    type: "application/json"
+function renderizarKpis(filtrados) {
+  const receberAberto = filtrados.filter((l) => l.tipo === "receber" && l.status !== "pago");
+  const pagarAberto = filtrados.filter((l) => l.tipo === "pagar" && l.status !== "pago");
+
+  const totalReceber = receberAberto.reduce((acc, l) => acc + Number(l.valor || 0), 0);
+  const totalPagar = pagarAberto.reduce((acc, l) => acc + Number(l.valor || 0), 0);
+
+  const contasFiltradas =
+    state.filtroBanco === "todos" || !state.filtroBanco
+      ? state.contas
+      : state.contas.filter((c) => String(c.banco) === state.filtroBanco);
+
+  const saldoConsolidado = contasFiltradas.reduce(
+    (acc, c) => acc + Number(c.saldo_atual || 0),
+    0
+  );
+
+  const elReceber = document.querySelector("#kpi-receber");
+  const elMetaReceber = document.querySelector("#meta-receber");
+  const elPagar = document.querySelector("#kpi-pagar");
+  const elMetaPagar = document.querySelector("#meta-pagar");
+  const elLiquido = document.querySelector("#kpi-liquido");
+  const elFluxo = document.querySelector("#kpi-fluxo");
+  const elLabelPeriodo = document.querySelector("#label-periodo");
+
+  if (elReceber) elReceber.textContent = formatarMoeda(totalReceber);
+  if (elMetaReceber) {
+    elMetaReceber.textContent = `${receberAberto.length} títulos pendentes/atrasados`;
+  }
+  if (elPagar) elPagar.textContent = formatarMoeda(totalPagar);
+  if (elMetaPagar) {
+    elMetaPagar.textContent = `${pagarAberto.length} títulos pendentes/atrasados`;
+  }
+  if (elLiquido) elLiquido.textContent = formatarMoeda(saldoConsolidado);
+  if (elFluxo) elFluxo.textContent = formatarMoeda(state.fluxo.saldo_liquido);
+  if (elLabelPeriodo) {
+    elLabelPeriodo.textContent = state.periodoFluxo === "mensal" ? "Mensal" : "Diário";
+  }
+}
+
+function renderizarBancos() {
+  const container = document.querySelector("#lista-bancos");
+  if (!container) return;
+
+  const contasExibidas =
+    state.filtroBanco === "todos" || !state.filtroBanco
+      ? state.contas
+      : state.contas.filter((c) => String(c.banco) === state.filtroBanco);
+
+  container.innerHTML = contasExibidas
+    .map(
+      (c) => `
+      <article class="conta-card" data-conta-id="${c.id_conta}">
+        <div class="conta-head">
+          <strong>${c.banco}</strong>
+          <span class="badge">${c.apelido_conta || c.tipo_conta}</span>
+        </div>
+        <div class="conta-saldo">${formatarMoeda(c.saldo_atual)}</div>
+        <div class="conta-meta">
+          <span>Inicial: ${formatarMoeda(c.saldo_inicial)}</span>
+          <span>Aberto: ${c.qtd_em_aberto ?? 0}</span>
+          <span>Atrasados: ${c.qtd_atrasados ?? 0}</span>
+        </div>
+      </article>
+    `
+    )
+    .join("");
+}
+
+function renderizarTabela(filtrados) {
+  const tbody = document.querySelector("#tabela-lancamentos");
+  const contador = document.querySelector("#contador-linhas");
+
+  if (contador) {
+    contador.textContent = `${filtrados.length} ${filtrados.length === 1 ? "registro" : "registros"}`;
+  }
+  if (!tbody) return;
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7">Nenhum lançamento encontrado para os filtros atuais.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados
+    .map((item) => {
+      const tipoLabel = item.tipo === "receber" ? "A Receber" : "A Pagar";
+      const sinal = item.tipo === "receber" ? "+" : "-";
+      const botaoPagar =
+        item.status !== "pago"
+          ? `<button type="button" class="btn-outline btn-sm" data-pagar-id="${item.id_lancamento}">Marcar Pago</button>`
+          : `<span class="meta-pago">Pago (${formatarData(item.data_pagamento)})</span>`;
+
+      return `
+        <tr>
+          <td>${item.descricao}</td>
+          <td>${tipoLabel}</td>
+          <td>${item.banco}</td>
+          <td>${formatarData(item.data_vencimento)}</td>
+          <td class="${item.tipo === "receber" ? "positivo" : "negativo"}">${sinal} ${formatarMoeda(item.valor)}</td>
+          <td><span class="status-${item.status}">${item.status}</span></td>
+          <td>${botaoPagar}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderizarTudo() {
+  const filtrados = getLancamentosFiltrados();
+  renderizarKpis(filtrados);
+  renderizarBancos();
+  renderizarTabela(filtrados);
+}
+
+async function criarLancamento(event) {
+  event.preventDefault();
+
+  const descricao = String(document.querySelector("#descricao")?.value || "").trim();
+  const tipo = String(document.querySelector("#tipo")?.value || "receber");
+  const banco = String(document.querySelector("#banco")?.value || "Itaú");
+  const valor = Number(document.querySelector("#valor")?.value || 0);
+  const dataVencimento = String(document.querySelector("#vencimento")?.value || "");
+  const status = String(document.querySelector("#status")?.value || "pendente");
+
+  if (!descricao || valor <= 0 || !dataVencimento) return;
+
+  const idConta = BANCO_PARA_CONTA_ID[banco] || 1;
+  const payload = {
+    id_conta: idConta,
+    id_categoria: null,
+    descricao,
+    tipo,
+    valor,
+    data_vencimento: dataVencimento,
+    status,
+  };
+
+  try {
+    if (state.apiOnline) {
+      await apiRequest("/lancamentos", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      await carregarDados();
+    } else {
+      const conta = state.contas.find((c) => Number(c.id_conta) === idConta);
+      const novoId =
+        Math.max(0, ...state.lancamentos.map((l) => Number(l.id_lancamento || 0))) + 1;
+
+      state.lancamentos.unshift({
+        id_lancamento: novoId,
+        id_conta: idConta,
+        banco: conta ? conta.banco : banco,
+        apelido_conta: conta ? conta.apelido_conta : "",
+        categoria: "Geral",
+        data_pagamento: status === "pago" ? new Date().toISOString().slice(0, 10) : null,
+        ...payload,
+      });
+
+      if (status === "pago" && conta) {
+        const delta = tipo === "receber" ? valor : -valor;
+        conta.saldo_atual = Number(conta.saldo_atual || 0) + delta;
+      }
+
+      state.fluxo = calcularFluxoFallback(state.periodoFluxo);
+      renderizarTudo();
+    }
+
+    document.querySelector("#form-lancamento")?.reset();
+  } catch (err) {
+    console.error("Erro ao adicionar lançamento:", err);
+  }
+}
+
+async function liquidarLancamento(idLancamento) {
+  try {
+    if (state.apiOnline) {
+      await apiRequest(`/lancamentos/${idLancamento}/pagar`, {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      });
+      await carregarDados();
+      return;
+    }
+
+    const item = state.lancamentos.find(
+      (l) => Number(l.id_lancamento) === Number(idLancamento)
+    );
+    if (!item || item.status === "pago") return;
+
+    item.status = "pago";
+    item.data_pagamento = new Date().toISOString().slice(0, 10);
+
+    const conta = state.contas.find((c) => Number(c.id_conta) === Number(item.id_conta));
+    if (conta) {
+      const delta = item.tipo === "receber" ? Number(item.valor) : -Number(item.valor);
+      conta.saldo_atual = Number(conta.saldo_atual || 0) + delta;
+    }
+
+    state.fluxo = calcularFluxoFallback(state.periodoFluxo);
+    renderizarTudo();
+  } catch (err) {
+    console.error("Erro ao liquidar lançamento:", err);
+  }
+}
+
+function checarVencimentos() {
+  const hoje = new Date().toISOString().slice(0, 10);
+  let alterados = 0;
+
+  state.lancamentos.forEach((item) => {
+    if (item.status === "pendente" && item.data_vencimento && item.data_vencimento < hoje) {
+      item.status = "atrasado";
+      alterados += 1;
+    }
   });
+
+  renderizarTudo();
+  console.info(`Verificação de vencimentos concluída: ${alterados} título(s) marcado(s) como atrasado.`);
+}
+
+function exportarJson() {
+  const dados = {
+    exportado_em: new Date().toISOString(),
+    periodo_fluxo: state.periodoFluxo,
+    contas: state.contas,
+    lancamentos: getLancamentosFiltrados(),
+    fluxo: state.fluxo,
+  };
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `erp-financeiro-${hojeISO()}.json`;
+  a.download = "sysfin-erp-export.json";
   a.click();
   URL.revokeObjectURL(url);
 }
 
-function resetarDemo() {
-  lancamentos = [...LANCAMENTOS_EXEMPLO];
-  salvarLancamentos();
-  renderTudo();
+async function resetarDemo() {
+  state.filtroBanco = "todos";
+  state.filtroStatus = "todos";
+  state.periodoFluxo = "diario";
+
+  const elBanco = document.querySelector("#filtro-banco");
+  const elStatus = document.querySelector("#filtro-status");
+  const elVisao = document.querySelector("#visao-fluxo");
+  if (elBanco) elBanco.value = "todos";
+  if (elStatus) elStatus.value = "todos";
+  if (elVisao) elVisao.value = "diario";
+
+  await carregarDados();
 }
 
-document.getElementById("form-lancamento").addEventListener("submit", (e) => {
-  e.preventDefault();
+function vincularEventos() {
+  document.querySelector("#form-lancamento")?.addEventListener("submit", criarLancamento);
 
-  const novo = {
-    id: Date.now(),
-    descricao: document.getElementById("descricao").value.trim(),
-    tipo: document.getElementById("tipo").value,
-    banco: document.getElementById("banco").value,
-    valor: parseFloat(document.getElementById("valor").value),
-    vencimento: document.getElementById("vencimento").value,
-    status: document.getElementById("status").value
-  };
+  document.querySelector("#filtro-banco")?.addEventListener("change", (e) => {
+    state.filtroBanco = e.target.value;
+    renderizarTudo();
+  });
 
-  lancamentos.unshift(novo);
-  salvarLancamentos();
-  e.target.reset();
-  renderTudo();
-});
+  document.querySelector("#filtro-status")?.addEventListener("change", (e) => {
+    state.filtroStatus = e.target.value;
+    renderizarTudo();
+  });
 
-document.getElementById("filtro-status").addEventListener("change", renderTabela);
-document.getElementById("filtro-banco").addEventListener("change", () => {
-  renderKPIs();
-  renderTabela();
-});
-document.getElementById("visao-fluxo").addEventListener("change", renderKPIs);
-document.getElementById("btn-verificar-atrasos").addEventListener("click", verificarVencimentosAtrasados);
-document.getElementById("btn-exportar-json").addEventListener("click", exportarJSON);
-document.getElementById("btn-resetar-dados").addEventListener("click", resetarDemo);
+  document.querySelector("#visao-fluxo")?.addEventListener("change", async (e) => {
+    state.periodoFluxo = e.target.value === "mensal" ? "mensal" : "diario";
+    await carregarDados();
+  });
 
-function renderTudo() {
-  renderKPIs();
-  renderBancos();
-  renderTabela();
+  document.querySelector("#btn-verificar-atrasos")?.addEventListener("click", checarVencimentos);
+  document.querySelector("#btn-exportar-json")?.addEventListener("click", exportarJson);
+  document.querySelector("#btn-resetar-dados")?.addEventListener("click", resetarDemo);
+
+  document.addEventListener("click", async (event) => {
+    const btn = event.target.closest("[data-pagar-id]");
+    if (!btn) return;
+    await liquidarLancamento(btn.dataset.pagarId);
+  });
 }
 
-renderTudo();
+document.addEventListener("DOMContentLoaded", () => {
+  vincularEventos();
+  carregarDados();
+});
